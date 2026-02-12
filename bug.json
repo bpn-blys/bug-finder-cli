@@ -1,0 +1,5 @@
+{
+"title":"Provider declined a direct booking couple massage and still received the chat message in the app",
+"description":"Hi team, Richard here. Issue: The provider reached out to us saying that she had declined a direct booking couples massage request and still received a chat in the other providers name that accepted the booking. Provider’s ID: https://admin.getblys.com/admin-therapists/9495 Actual Outcome: The provider who declined the direct booking couples massage request still received chat messages on her app after another provider accepting it. Expected Outcome: The provider who declined the direct booking couples massage request should not receive chat messages after she had declined it and should have been received by the provider who accepted the booking request. Workaround: None",
+"localRepoUrl":"/home/acutie/blys-github/blys-node"
+}
