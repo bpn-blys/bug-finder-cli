@@ -1,12 +1,13 @@
 import { writeFile, stat } from "node:fs/promises";
 import * as path from "node:path";
+import os from "os";
 
 import { CopilotClient, type MessageOptions } from "@github/copilot-sdk";
 
 import { formatError } from "./errors";
 import { status, warnStatus } from "./logging";
 
-const CLI_PATH = "/home/acutie/.local/bin/copilot";
+const CLI_PATH = path.join(os.homedir(), ".local", "bin", "copilot");
 const LOG_DIR = "./copilot-logs";
 const MODEL = process.env.COPILOT_MODEL ?? "gpt-4.1";
 const TIMEOUT_MS = 3 * 60 * 1000;

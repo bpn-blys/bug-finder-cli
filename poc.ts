@@ -1,4 +1,6 @@
 import { CopilotClient } from "@github/copilot-sdk";
+import os from "os";
+import path from "path";
 
 /**
  * Poc code to test the Copilot SDK client connection and basic functionality.
@@ -11,7 +13,7 @@ const model = "gpt-4.1";
 
 async function main() {
   const client = new CopilotClient({
-    cliPath: "/home/acutie/.local/bin/copilot",
+    cliPath: path.join(os.homedir(), ".local", "bin", "copilot"),
     logLevel: "debug",
     cliArgs: ["--log-dir", "./copilot-logs"],
   });

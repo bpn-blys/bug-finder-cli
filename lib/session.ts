@@ -1,5 +1,7 @@
 import { CopilotClient, type MessageOptions } from "@github/copilot-sdk";
 import chalk from "chalk";
+import os from "os";
+import path from "path";
 
 import { errorStatus, intentStatus, status, toolStatus, warnStatus } from "./logging";
 import { ensureLineBreak, writeStdout } from "./output";
@@ -20,7 +22,7 @@ type RunOptions = {
 type Session = Awaited<ReturnType<CopilotClient["createSession"]>>;
 
 const DEFAULT_MODEL = "gpt-4.1";
-const DEFAULT_CLI_PATH = "/home/acutie/.local/bin/copilot";
+const DEFAULT_CLI_PATH = path.join(os.homedir(), ".local", "bin", "copilot");
 const DEFAULT_LOG_DIR = "./copilot-logs";
 const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
 
