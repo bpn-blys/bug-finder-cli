@@ -28,26 +28,35 @@ bun run index.ts --help
 ### Bug JSON schema
 
 ```json
-{
-  "title": "Bug title",
-  "description": "Detailed description of the bug",
-  "localRepoUrls": ["/absolute/path/to/local/repo"],
-  "imagePaths": ["/absolute/path/to/screenshot.png"]
-}
+[
+  {
+    "title": "Bug title",
+    "description": "Detailed description of the bug",
+    "status": "todo",
+    "bug-details": null,
+    "localRepoUrls": ["/absolute/path/to/local/repo"],
+    "imagePaths": ["/absolute/path/to/screenshot.png"]
+  }
+]
 ```
 
 Notes:
-- `localRepoUrl` (string) is still supported for a single repository.
+- `status` is optional; omitted status is treated as `todo`.
+- If provided, `status` must be one of `todo`, `in-progress`, or `done`.
+- `bug-details` is optional and is populated with structured findings after analysis.
+- `localRepoUrl` (string) is still supported for a single repository entry.
 - `imagePaths` is optional.
+- Each bug entry with `todo` or `in-progress` is processed and then updated to `done`.
 
 ### Output
 
-The report is printed to stdout with sections:
+The model response is requested in JSON and parsed into each entry's `bug-details` object:
 
-- 🐛 Probable Cause
-- 💡 Reason
-- 🔧 Suggested Fixes
-- 📊 Confidence Score (0–1)
+- `probableCause`
+- `reason`
+- `suggestedFixes`
+- `confidenceScore` (0–1)
+- `evidence` (when available)
 
 Progress and tool status updates are printed to stderr.
 

@@ -33,6 +33,7 @@ const registerSessionListeners = (
 ) => {
   let streamedOutput = false;
   let reasoningActive = false;
+  let reportContent = "";
 
   const beginReasoning = () => {
     if (!reasoningActive) {
@@ -108,15 +109,21 @@ const registerSessionListeners = (
   session.on("assistant.message_delta", (event) => {
     endReasoning(true);
     streamedOutput = true;
+    reportContent += event.data.deltaContent;
     writeStdout(formatReport(event.data.deltaContent));
   });
 
   session.on("assistant.message", (event) => {
     endReasoning();
     if (!streamedOutput) {
+      reportContent = event.data.content;
       writeStdout(formatReport(event.data.content));
+    } else if (reportContent.length === 0) {
+      reportContent = event.data.content;
     }
   });
+
+  return () => reportContent;
 };
 
 export const runCopilotSession = async (options: RunOptions) => {
@@ -133,6 +140,7 @@ export const runCopilotSession = async (options: RunOptions) => {
 
   let client: CopilotClient | undefined;
   let session: Session | undefined;
+  let finalReport = "";
   const formatThinking = (value: string) => chalk.gray(value);
   const formatReport = (value: string) => chalk.whiteBright(value);
 
@@ -153,12 +161,13 @@ export const runCopilotSession = async (options: RunOptions) => {
       workingDirectory,
     });
 
-    registerSessionListeners(session, formatThinking, formatReport);
+    const getReport = registerSessionListeners(session, formatThinking, formatReport);
 
     status("🔎 Running bug analysis...");
 
     try {
       await session.sendAndWait({ prompt, attachments }, timeoutMs);
+      finalReport = getReport();
     } finally {
       ensureLineBreak("stdout");
     }
@@ -184,4 +193,6 @@ export const runCopilotSession = async (options: RunOptions) => {
       }
     }
   }
+
+  return finalReport;
 };

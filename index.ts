@@ -1,9 +1,9 @@
-import { readFile, stat } from "node:fs/promises";
+import { readFile, stat, writeFile } from "node:fs/promises";
 import * as path from "node:path";
 import { Command } from "commander";
 
 import { errorStatus, status } from "./lib/logging";
-import { parseBugInput, type BugInput } from "./lib/bug";
+import { parseBugInput, type BugFinding, type BugInput, type BugRecord } from "./lib/bug";
 import { buildPrompt, buildSystemMessage } from "./lib/prompt";
 import { formatError } from "./lib/errors";
 import { runCopilotSession } from "./lib/session";
@@ -20,7 +20,7 @@ const buildProgram = () =>
     .showHelpAfterError()
     .addHelpText(
       "after",
-      "\nBug JSON schema:\n  {\n    \"title\": \"Bug title\",\n    \"description\": \"Detailed description of the bug\",\n    \"localRepoUrls\": [\"/absolute/path/to/local/repo\"],\n    \"imagePaths\": [\"/absolute/path/to/screenshot.png\"]\n  }\n\nNotes:\n- localRepoUrl (string) is still supported for a single repository.\n- imagePaths is optional.",
+      '\nBug JSON schema:\n  [\n    {\n      "title": "Bug title",\n      "description": "Detailed description of the bug",\n      "status": "todo",\n      "bug-details": null,\n      "localRepoUrls": ["/absolute/path/to/local/repo"],\n      "imagePaths": ["/absolute/path/to/screenshot.png"]\n    }\n  ]\n\nNotes:\n- status is optional; when omitted it defaults to todo.\n- if provided, status must be one of: todo, in-progress, done.\n- bug-details is optional and is filled with structured findings after analysis.\n- localRepoUrl (string) is still supported for a single repository entry.\n- imagePaths is optional.',
     );
 
 const readBugInput = async (bugJsonPath: string): Promise<BugInput> => {
@@ -37,14 +37,18 @@ const readBugInput = async (bugJsonPath: string): Promise<BugInput> => {
   return parseBugInput(parsed);
 };
 
-const resolveRepoPaths = async (repoUrls: string[]) => {
+const writeBugInput = async (bugJsonPath: string, bugs: BugInput) => {
+  await writeFile(bugJsonPath, `${JSON.stringify(bugs, null, 2)}\n`, "utf8");
+};
+
+const resolveRepoPaths = async (repoUrls: string[], baseDir: string) => {
   if (repoUrls.length === 0) {
     throw new Error("At least one repository path must be provided.");
   }
 
   const resolved = await Promise.all(
     repoUrls.map(async (repoUrl) => {
-      const repoPath = path.resolve(repoUrl);
+      const repoPath = path.resolve(baseDir, repoUrl);
       const repoStat = await stat(repoPath).catch(() => {
         throw new Error(`Repository path not found: ${repoPath}`);
       });
@@ -58,14 +62,14 @@ const resolveRepoPaths = async (repoUrls: string[]) => {
   return Array.from(new Set(resolved));
 };
 
-const resolveImagePaths = async (imagePaths?: string[]) => {
+const resolveImagePaths = async (imagePaths: string[] | undefined, baseDir: string) => {
   if (!imagePaths || imagePaths.length === 0) {
     return [];
   }
 
   const resolved = await Promise.all(
     imagePaths.map(async (imagePath) => {
-      const resolvedPath = path.resolve(imagePath);
+      const resolvedPath = path.resolve(baseDir, imagePath);
       const imageStat = await stat(resolvedPath).catch(() => {
         throw new Error(`Image path not found: ${resolvedPath}`);
       });
@@ -134,35 +138,105 @@ const buildAttachments = (repoPaths: string[], imagePaths: string[]) => {
 
 const resolveModel = () => process.env.COPILOT_MODEL ?? "gpt-4.1";
 
+const requireString = (value: unknown, field: string) => {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`Copilot response field "${field}" must be a non-empty string.`);
+  }
+  return value.trim();
+};
+
+const parseFindings = (report: string): BugFinding => {
+  const trimmed = report.trim();
+  if (trimmed.length === 0) {
+    throw new Error("Copilot response was empty; expected a JSON findings object.");
+  }
+  const codeFenceMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  const jsonPayload = (codeFenceMatch?.[1] ?? trimmed).trim();
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonPayload);
+  } catch (error) {
+    throw new Error(`Failed to parse Copilot findings JSON: ${formatError(error)}`);
+  }
+
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Copilot findings must be a JSON object.");
+  }
+
+  const record = parsed as Record<string, unknown>;
+  const confidenceScore = record.confidenceScore;
+  if (typeof confidenceScore !== "number" || !Number.isFinite(confidenceScore)) {
+    throw new Error('Copilot response field "confidenceScore" must be a finite number.');
+  }
+  if (confidenceScore < 0 || confidenceScore > 1) {
+    throw new Error('Copilot response field "confidenceScore" must be between 0 and 1.');
+  }
+  if (!Array.isArray(record.suggestedFixes)) {
+    throw new Error('Copilot response field "suggestedFixes" must be an array of strings.');
+  }
+
+  return {
+    probableCause: requireString(record.probableCause, "probableCause"),
+    reason: requireString(record.reason, "reason"),
+    suggestedFixes: record.suggestedFixes.map((value, index) => requireString(value, `suggestedFixes[${index}]`)),
+    confidenceScore,
+    evidence: record.evidence,
+  };
+};
+
 const main = async () => {
   const program = buildProgram();
   program.parse(process.argv);
 
   const bugJsonPath = path.resolve(program.args[0] as string);
-  const bug = await readBugInput(bugJsonPath);
-  const repoPaths = await resolveRepoPaths(bug.localRepoUrls);
-  await ensureBugFinderDocs(repoPaths);
-  const imagePaths = await resolveImagePaths(bug.imagePaths);
-  const workingDirectory = findCommonAncestor(repoPaths);
-  const normalizedBug: BugInput = {
-    ...bug,
-    localRepoUrls: repoPaths,
-    imagePaths: imagePaths.length > 0 ? imagePaths : undefined,
-  };
+  const bugFileDir = path.dirname(bugJsonPath);
+  const bugs = await readBugInput(bugJsonPath);
 
-  status(`📂 Using repositories:\n${repoPaths.map((repoPath) => `- ${repoPath}`).join("\n")}`);
-  status(`📍 Working directory: ${workingDirectory}`);
-  process.chdir(workingDirectory);
+  for (const [index, bug] of bugs.entries()) {
+    const currentStatus = bug.status ?? "todo";
+    if (currentStatus === "done") {
+      status(`⏭️ Skipping bug ${index + 1}/${bugs.length} (status: done).`);
+      continue;
+    }
 
-  const prompt = buildPrompt(normalizedBug, repoPaths);
-  const attachments = buildAttachments(repoPaths, imagePaths);
-  await runCopilotSession({
-    prompt,
-    systemMessage: buildSystemMessage(),
-    model: resolveModel(),
-    attachments,
-    workingDirectory,
-  });
+    const inProgressBug: BugRecord = { ...bug, status: "in-progress" };
+    bugs[index] = inProgressBug;
+    await writeBugInput(bugJsonPath, bugs);
+
+    status(`🐞 Processing bug ${index + 1}/${bugs.length}: ${bug.title}`);
+    const repoPaths = await resolveRepoPaths(inProgressBug.localRepoUrls, bugFileDir);
+    await ensureBugFinderDocs(repoPaths);
+    const imagePaths = await resolveImagePaths(inProgressBug.imagePaths, bugFileDir);
+    const workingDirectory = findCommonAncestor(repoPaths);
+    const normalizedBug: BugRecord = {
+      ...inProgressBug,
+      localRepoUrls: repoPaths,
+      imagePaths: imagePaths.length > 0 ? imagePaths : undefined,
+    };
+
+    status(`📂 Using repositories:\n${repoPaths.map((repoPath) => `- ${repoPath}`).join("\n")}`);
+    status(`📍 Working directory: ${workingDirectory}`);
+    process.chdir(workingDirectory);
+
+    const prompt = buildPrompt(normalizedBug, repoPaths);
+    const attachments = buildAttachments(repoPaths, imagePaths);
+    const report = await runCopilotSession({
+      prompt,
+      systemMessage: buildSystemMessage(),
+      model: resolveModel(),
+      attachments,
+      workingDirectory,
+    });
+    const findings = parseFindings(report);
+
+    bugs[index] = {
+      ...normalizedBug,
+      status: "done",
+      "bug-details": findings,
+    };
+    await writeBugInput(bugJsonPath, bugs);
+  }
 };
 
 try {
