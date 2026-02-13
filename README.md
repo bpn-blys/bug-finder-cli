@@ -54,4 +54,5 @@ Progress and tool status updates are printed to stderr.
 ## Notes
 
 - Optional model override: set `COPILOT_MODEL` (defaults to `gpt-4.1`).
+- Repositories missing `bug-finder.md` receive an auto-generated architecture index produced via the Copilot SDK before analysis runs.
 - This project was created using `bun init` in bun v1.3.9. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.

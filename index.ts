@@ -7,6 +7,7 @@ import { parseBugInput, type BugInput } from "./lib/bug";
 import { buildPrompt, buildSystemMessage } from "./lib/prompt";
 import { formatError } from "./lib/errors";
 import { runCopilotSession } from "./lib/session";
+import { ensureBugFinderDocs } from "./lib/bugFinderDoc";
 
 type Attachments = NonNullable<Parameters<typeof runCopilotSession>[0]["attachments"]>;
 
@@ -140,6 +141,7 @@ const main = async () => {
   const bugJsonPath = path.resolve(program.args[0] as string);
   const bug = await readBugInput(bugJsonPath);
   const repoPaths = await resolveRepoPaths(bug.localRepoUrls);
+  await ensureBugFinderDocs(repoPaths);
   const imagePaths = await resolveImagePaths(bug.imagePaths);
   const workingDirectory = findCommonAncestor(repoPaths);
   const normalizedBug: BugInput = {

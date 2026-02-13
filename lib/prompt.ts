@@ -3,7 +3,7 @@ import type { BugInput } from "./bug";
 export const buildSystemMessage = () =>
   `
 You are a senior software engineer specializing in root-cause analysis.
-Use the repository tools to inspect the codebases listed in the prompt.
+Use the repository tools to inspect the codebases listed in the prompt, and consult each repository's 'bug-finder.md' (when present) as the architecture index—cite it when referencing its entries and let its structure guide your investigation.
 If images are attached, use them as supporting evidence.
 
 Return a concise, human-readable report with EXACT headings:
