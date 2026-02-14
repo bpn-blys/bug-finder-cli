@@ -10,10 +10,12 @@ import path from "path";
  */
 
 const model = "gpt-4.1";
+const defaultCliPath = path.join(os.homedir(), ".local", "bin", "copilot");
+const cliPath = process.env.COPILOT_PATH?.trim() || defaultCliPath;
 
 async function main() {
   const client = new CopilotClient({
-    cliPath: path.join(os.homedir(), ".local", "bin", "copilot"),
+    cliPath,
     logLevel: "debug",
     cliArgs: ["--log-dir", "./copilot-logs"],
   });

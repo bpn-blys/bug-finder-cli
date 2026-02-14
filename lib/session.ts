@@ -25,6 +25,7 @@ const DEFAULT_MODEL = "gpt-4.1";
 const DEFAULT_CLI_PATH = path.join(os.homedir(), ".local", "bin", "copilot");
 const DEFAULT_LOG_DIR = "./copilot-logs";
 const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
+const resolveCliPath = () => process.env.COPILOT_PATH?.trim() || DEFAULT_CLI_PATH;
 
 const registerSessionListeners = (
   session: Session,
@@ -131,7 +132,7 @@ export const runCopilotSession = async (options: RunOptions) => {
     prompt,
     systemMessage,
     model = DEFAULT_MODEL,
-    cliPath = DEFAULT_CLI_PATH,
+    cliPath = resolveCliPath(),
     logDir = DEFAULT_LOG_DIR,
     timeoutMs = DEFAULT_TIMEOUT_MS,
     attachments,

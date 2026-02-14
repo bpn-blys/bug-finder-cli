@@ -7,6 +7,11 @@ Analyze a bug description against a local repository using the GitHub Copilot SD
 - Bun
 - GitHub Copilot CLI installed and authenticated (`copilot --version`)
 
+Before running the application, perform these steps:
+
+- Download and install the GitHub Copilot CLI for your platform (see https://github.com/github/copilot-cli or use your package manager).
+- Log in to the GitHub Copilot CLI locally (e.g. `copilot login`) — the program uses the locally installed Copilot CLI.
+
 ## Install
 
 ```bash
@@ -63,5 +68,6 @@ Progress and tool status updates are printed to stderr.
 ## Notes
 
 - Optional model override: set `COPILOT_MODEL` (defaults to `gpt-4.1`).
+- Optional CLI path override: set `COPILOT_PATH` (defaults to `~/.local/bin/copilot`).
 - Repositories missing `bug-finder.md` receive an auto-generated architecture index produced via the Copilot SDK before analysis runs.
 - This project was created using `bun init` in bun v1.3.9. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
