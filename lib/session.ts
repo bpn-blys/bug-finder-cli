@@ -1,12 +1,11 @@
 import { CopilotClient, type MessageOptions } from "@github/copilot-sdk";
 import chalk from "chalk";
-import os from "os";
-import path from "path";
 
 import { errorStatus, intentStatus, status, toolStatus, warnStatus } from "./logging";
 import { ensureLineBreak, writeStdout } from "./output";
 import { formatToolUsage } from "./toolUsage";
 import { formatError } from "./errors";
+import { config, resolveCopilotCliPath, resolveCopilotLogDir } from "../constants/config";
 
 type RunOptions = {
   prompt: string;
@@ -20,12 +19,6 @@ type RunOptions = {
 };
 
 type Session = Awaited<ReturnType<CopilotClient["createSession"]>>;
-
-const DEFAULT_MODEL = "gpt-4.1";
-const DEFAULT_CLI_PATH = path.join(os.homedir(), ".local", "bin", "copilot");
-const DEFAULT_LOG_DIR = "./copilot-logs";
-const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
-const resolveCliPath = () => process.env.COPILOT_PATH?.trim() || DEFAULT_CLI_PATH;
 
 const registerSessionListeners = (
   session: Session,
@@ -131,10 +124,10 @@ export const runCopilotSession = async (options: RunOptions) => {
   const {
     prompt,
     systemMessage,
-    model = DEFAULT_MODEL,
-    cliPath = resolveCliPath(),
-    logDir = DEFAULT_LOG_DIR,
-    timeoutMs = DEFAULT_TIMEOUT_MS,
+    model = config.copilot.defaults.model,
+    cliPath = resolveCopilotCliPath(),
+    logDir = resolveCopilotLogDir(),
+    timeoutMs = config.copilot.defaults.analysisTimeoutMs,
     attachments,
     workingDirectory,
   } = options;

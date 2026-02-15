@@ -1,0 +1,7 @@
+[
+  {
+    "title": "Multiple api fetch upon toggling the showdata component",
+    "description": "when clicking on the toggle button, it is fetching the api multiple times, which is not expected and should only fetch once.",
+    "localRepoUrls": ["path_to/buggy-react"]
+  }
+]

@@ -1,4 +1,6 @@
-const formatSnippet = (value: string, max = 160) => {
+import { config } from "../constants/config";
+
+const formatSnippet = (value: string, max = config.toolUsage.maxSnippetLength) => {
   const collapsed = value.replace(/\s+/g, " ").trim();
   if (collapsed.length === 0) {
     return "";

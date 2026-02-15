@@ -1,6 +1,5 @@
 import { CopilotClient } from "@github/copilot-sdk";
-import os from "os";
-import path from "path";
+import { config, resolveCopilotCliPath, resolveCopilotLogDir } from "./constants/config";
 
 /**
  * Poc code to test the Copilot SDK client connection and basic functionality.
@@ -9,15 +8,14 @@ import path from "path";
  * https://github.com/github/copilot-sdk/blob/main/docs/getting-started.md
  */
 
-const model = "gpt-4.1";
-const defaultCliPath = path.join(os.homedir(), ".local", "bin", "copilot");
-const cliPath = process.env.COPILOT_PATH?.trim() || defaultCliPath;
+const model = process.env[config.copilot.env.model] ?? config.copilot.defaults.model;
+const cliPath = resolveCopilotCliPath();
 
 async function main() {
   const client = new CopilotClient({
     cliPath,
     logLevel: "debug",
-    cliArgs: ["--log-dir", "./copilot-logs"],
+    cliArgs: ["--log-dir", resolveCopilotLogDir()],
   });
   console.log("Starting Copilot client...");
   await client.start();

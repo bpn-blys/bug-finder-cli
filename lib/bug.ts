@@ -1,4 +1,6 @@
-export type BugStatus = "todo" | "in-progress" | "done";
+import { config } from "../constants/config";
+
+export type BugStatus = (typeof config.bug.status)[keyof typeof config.bug.status];
 
 export type BugFinding = {
   probableCause: string;
@@ -26,10 +28,14 @@ const requireNonEmptyString = (value: unknown, field: string) => {
 
 const requireStatus = (value: unknown, field: string): BugStatus => {
   const normalized = requireNonEmptyString(value, field);
-  if (normalized === "todo" || normalized === "in-progress" || normalized === "done") {
+  if (
+    normalized === config.bug.status.todo ||
+    normalized === config.bug.status.inProgress ||
+    normalized === config.bug.status.done
+  ) {
     return normalized;
   }
-  throw new Error(`Bug JSON field "${field}" must be one of: todo, in-progress, done.`);
+  throw new Error(`Bug JSON field "${field}" must be one of: ${config.bug.statusDisplay}.`);
 };
 
 const optionalStatus = (value: unknown, field: string): BugStatus | undefined => {
@@ -73,7 +79,7 @@ const optionalBugDetails = (value: unknown, field: string): BugFinding | null | 
   if (typeof confidenceScore !== "number" || !Number.isFinite(confidenceScore)) {
     throw new Error(`Bug JSON field "${field}.confidenceScore" must be a number.`);
   }
-  if (confidenceScore < 0 || confidenceScore > 1) {
+  if (confidenceScore < config.bug.confidenceScore.min || confidenceScore > config.bug.confidenceScore.max) {
     throw new Error(`Bug JSON field "${field}.confidenceScore" must be between 0 and 1.`);
   }
   return {

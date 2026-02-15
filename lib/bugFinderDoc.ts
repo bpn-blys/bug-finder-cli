@@ -1,24 +1,16 @@
 import { writeFile, stat } from "node:fs/promises";
 import * as path from "node:path";
-import os from "os";
 
 import { CopilotClient, type MessageOptions } from "@github/copilot-sdk";
 
 import { formatError } from "./errors";
 import { status, warnStatus } from "./logging";
+import { config, resolveCopilotCliPath, resolveCopilotLogDir } from "../constants/config";
 
-const DEFAULT_CLI_PATH = path.join(os.homedir(), ".local", "bin", "copilot");
-const CLI_PATH = process.env.COPILOT_PATH?.trim() || DEFAULT_CLI_PATH;
-const LOG_DIR = "./copilot-logs";
-const MODEL = process.env.COPILOT_MODEL ?? "gpt-4.1";
-const TIMEOUT_MS = 3 * 60 * 1000;
-
-const BUG_FINDER_SYSTEM_MESSAGE = `
-You are a documentation engineer who generates concise architecture guides.
-Produce only the contents of a bug-finder.md file for the attached repository.
-Focus on creating an "Architecture Index" that lists high-level directories or modules with short descriptions (1-2 sentences) and how they relate to the project.
-Keep the format purely Markdown and avoid analysis, to-do lists, or narrative text.
-`.trim();
+const CLI_PATH = resolveCopilotCliPath();
+const LOG_DIR = resolveCopilotLogDir();
+const MODEL = process.env[config.copilot.env.model] ?? config.copilot.defaults.model;
+const TIMEOUT_MS = config.copilot.defaults.bugFinderDocTimeoutMs;
 
 type Session = Awaited<ReturnType<CopilotClient["createSession"]>>;
 
@@ -33,22 +25,22 @@ const hasBugFinderFile = async (filePath: string) => {
 
 export const ensureBugFinderDocs = async (repoPaths: string[]) => {
   for (const repoPath of repoPaths) {
-    const docPath = path.join(repoPath, "bug-finder.md");
+    const docPath = path.join(repoPath, config.files.bugFinderDocName);
     if (await hasBugFinderFile(docPath)) {
-      status(`✅ Existing bug-finder.md detected at ${docPath}`);
+      status(`✅ Existing ${config.files.bugFinderDocName} detected at ${docPath}`);
       continue;
     }
 
-    status(`🧩 Generating bug-finder.md for ${repoPath}...`);
+    status(`🧩 Generating ${config.files.bugFinderDocName} for ${repoPath}...`);
     let content: string;
     try {
       content = await generateBugFinderDoc(repoPath);
     } catch (error) {
-      throw new Error(`Failed to generate bug-finder.md for ${repoPath}: ${formatError(error)}`);
+      throw new Error(`Failed to generate ${config.files.bugFinderDocName} for ${repoPath}: ${formatError(error)}`);
     }
 
     await writeFile(docPath, `${content.trimEnd()}\n`, "utf8");
-    status(`💾 Written bug-finder.md to ${docPath}`);
+    status(`💾 Written ${config.files.bugFinderDocName} to ${docPath}`);
   }
 };
 
@@ -65,7 +57,7 @@ const generateBugFinderDoc = async (repoPath: string) => {
     session = await client.createSession({
       model: MODEL,
       streaming: false,
-      systemMessage: { content: BUG_FINDER_SYSTEM_MESSAGE },
+      systemMessage: { content: config.copilot.bugFinderDocSystemMessage },
       workingDirectory: repoPath,
     });
 
@@ -84,7 +76,7 @@ const generateBugFinderDoc = async (repoPath: string) => {
 
     const content = response?.data?.content?.trim();
     if (!content) {
-      throw new Error("Copilot did not return any content when generating bug-finder.md.");
+      throw new Error(`Copilot did not return any content when generating ${config.files.bugFinderDocName}.`);
     }
 
     return content;
@@ -111,8 +103,8 @@ const generateBugFinderDoc = async (repoPath: string) => {
 const buildBugFinderPrompt = (repoPath: string) => `
 Repository root: ${repoPath}
 
-Task: Inspect the attached repository to create a concise bug-finder.md.
+Task: Inspect the attached repository to create a concise ${config.files.bugFinderDocName}.
 Outline an Architecture Index section (or similar structure) that lists the most relevant directories/modules followed by a short purpose sentence that describes how each area helps navigate the codebase.
 Include any other sections that support navigation (e.g., key entry points, important frameworks).
-Return only the markdown content of bug-finder.md.
+Return only the markdown content of ${config.files.bugFinderDocName}.
 `.trim();

@@ -1,9 +1,10 @@
 import type { BugRecord } from "./bug";
+import { config } from "../constants/config";
 
 export const buildSystemMessage = () =>
   `
 You are a senior software engineer specializing in root-cause analysis.
-Use the repository tools to inspect the codebases listed in the prompt, and consult each repository's 'bug-finder.md' (when present) as the architecture index—cite it when referencing its entries and let its structure guide your investigation.
+Use the repository tools to inspect the codebases listed in the prompt, and consult each repository's '${config.files.bugFinderDocName}' (when present) as the architecture index—cite it when referencing its entries and let its structure guide your investigation.
 If images are attached, use them as supporting evidence.
 
 Return ONLY a valid JSON object with this exact shape:

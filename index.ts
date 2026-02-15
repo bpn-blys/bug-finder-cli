@@ -8,20 +8,18 @@ import { buildPrompt, buildSystemMessage } from "./lib/prompt";
 import { formatError } from "./lib/errors";
 import { runCopilotSession } from "./lib/session";
 import { ensureBugFinderDocs } from "./lib/bugFinderDoc";
+import { config } from "./constants/config";
 
 type Attachments = NonNullable<Parameters<typeof runCopilotSession>[0]["attachments"]>;
 
 const buildProgram = () =>
   new Command()
-    .name("bug-finder-cli")
-    .description("Analyze a bug description against a local repository using the GitHub Copilot SDK.")
-    .argument("<bug.json>", "Path to the bug JSON file")
-    .usage("<bug.json>")
+    .name(config.app.name)
+    .description(config.app.description)
+    .argument(config.app.bugJsonArg, config.app.bugJsonArgDescription)
+    .usage(config.app.usage)
     .showHelpAfterError()
-    .addHelpText(
-      "after",
-      '\nBug JSON schema:\n  [\n    {\n      "title": "Bug title",\n      "description": "Detailed description of the bug",\n      "status": "todo",\n      "bug-details": null,\n      "localRepoUrls": ["/absolute/path/to/local/repo"],\n      "imagePaths": ["/absolute/path/to/screenshot.png"]\n    }\n  ]\n\nNotes:\n- status is optional; when omitted it defaults to todo.\n- if provided, status must be one of: todo, in-progress, done.\n- bug-details is optional and is filled with structured findings after analysis.\n- localRepoUrl (string) is still supported for a single repository entry.\n- imagePaths is optional.',
-    );
+    .addHelpText("after", config.app.bugJsonHelpText);
 
 const readBugInput = async (bugJsonPath: string): Promise<BugInput> => {
   status(`📄 Reading bug file: ${bugJsonPath}`);
@@ -136,7 +134,7 @@ const buildAttachments = (repoPaths: string[], imagePaths: string[]) => {
   return attachments.length > 0 ? attachments : undefined;
 };
 
-const resolveModel = () => process.env.COPILOT_MODEL ?? "gpt-4.1";
+const resolveModel = () => process.env[config.copilot.env.model] ?? config.copilot.defaults.model;
 
 const requireString = (value: unknown, field: string) => {
   if (typeof value !== "string" || value.trim().length === 0) {
@@ -169,7 +167,7 @@ const parseFindings = (report: string): BugFinding => {
   if (typeof confidenceScore !== "number" || !Number.isFinite(confidenceScore)) {
     throw new Error('Copilot response field "confidenceScore" must be a finite number.');
   }
-  if (confidenceScore < 0 || confidenceScore > 1) {
+  if (confidenceScore < config.bug.confidenceScore.min || confidenceScore > config.bug.confidenceScore.max) {
     throw new Error('Copilot response field "confidenceScore" must be between 0 and 1.');
   }
   if (!Array.isArray(record.suggestedFixes)) {
@@ -194,13 +192,13 @@ const main = async () => {
   const bugs = await readBugInput(bugJsonPath);
 
   for (const [index, bug] of bugs.entries()) {
-    const currentStatus = bug.status ?? "todo";
-    if (currentStatus === "done") {
+    const currentStatus = bug.status ?? config.bug.status.todo;
+    if (currentStatus === config.bug.status.done) {
       status(`⏭️ Skipping bug ${index + 1}/${bugs.length} (status: done).`);
       continue;
     }
 
-    const inProgressBug: BugRecord = { ...bug, status: "in-progress" };
+    const inProgressBug: BugRecord = { ...bug, status: config.bug.status.inProgress };
     bugs[index] = inProgressBug;
     await writeBugInput(bugJsonPath, bugs);
 
@@ -216,8 +214,6 @@ const main = async () => {
     };
 
     status(`📂 Using repositories:\n${repoPaths.map((repoPath) => `- ${repoPath}`).join("\n")}`);
-    status(`📍 Working directory: ${workingDirectory}`);
-    process.chdir(workingDirectory);
 
     const prompt = buildPrompt(normalizedBug, repoPaths);
     const attachments = buildAttachments(repoPaths, imagePaths);
@@ -232,7 +228,7 @@ const main = async () => {
 
     bugs[index] = {
       ...normalizedBug,
-      status: "done",
+      status: config.bug.status.done,
       "bug-details": findings,
     };
     await writeBugInput(bugJsonPath, bugs);
