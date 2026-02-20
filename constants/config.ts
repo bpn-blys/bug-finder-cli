@@ -50,6 +50,9 @@ Keep the format purely Markdown and avoid analysis, to-do lists, or narrative te
 	toolUsage: {
 		maxSnippetLength: 160,
 	},
+	debugLog: {
+		enabled: process.env.DEBUG_LOG === "1" || false,
+	},
 } as const;
 
 export const resolveCopilotCliPath = () =>

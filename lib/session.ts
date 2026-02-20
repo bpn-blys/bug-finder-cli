@@ -25,6 +25,8 @@ const registerSessionListeners = (
   formatThinking: (value: string) => string,
   formatReport: (value: string) => string,
 ) => {
+  const debugLog = config.debugLog.enabled;
+
   let streamedOutput = false;
   let reasoningActive = false;
   let reportContent = "";
@@ -48,12 +50,14 @@ const registerSessionListeners = (
   };
 
   session.on("assistant.intent", (event) => {
-    intentStatus(`🧭 Intent: ${event.data.intent}`);
+    if (debugLog) intentStatus(`🧭 Intent: ${event.data.intent}`);
   });
 
   session.on("assistant.reasoning_delta", (event) => {
-    beginReasoning();
-    writeStdout(formatThinking(event.data.deltaContent));
+    if (debugLog) {
+      beginReasoning();
+      writeStdout(formatThinking(event.data.deltaContent));
+    }
   });
 
   session.on("assistant.reasoning", () => {
@@ -61,18 +65,19 @@ const registerSessionListeners = (
   });
 
   session.on("session.info", (event) => {
-    status(`ℹ️ ${event.data.infoType}: ${event.data.message}`);
+    if (debugLog) status(`ℹ️ ${event.data.infoType}: ${event.data.message}`);
   });
 
   session.on("session.model_change", (event) => {
-    status(`🔁 Model change: ${event.data.previousModel ?? "unknown"} → ${event.data.newModel}`);
+    if (debugLog) status(`🔁 Model change: ${event.data.previousModel ?? "unknown"} → ${event.data.newModel}`);
   });
 
   session.on("session.compaction_start", () => {
-    status("🧹 Context compaction started.");
+    if (debugLog) status("🧹 Context compaction started.");
   });
 
   session.on("session.compaction_complete", (event) => {
+    if (!debugLog) return;
     if (event.data.success) {
       status("🧹 Context compaction complete.");
     } else {
@@ -81,23 +86,23 @@ const registerSessionListeners = (
   });
 
   session.on("tool.execution_start", (event) => {
-    toolStatus(formatToolUsage(event.data.toolName, event.data.arguments));
+    if (debugLog) toolStatus(formatToolUsage(event.data.toolName, event.data.arguments));
   });
 
   session.on("session.error", (event) => {
-    errorStatus(`❌ Session error (${event.data.errorType}): ${event.data.message}`);
+    if (debugLog) errorStatus(`❌ Session error (${event.data.errorType}): ${event.data.message}`);
   });
 
   session.on("subagent.started", (event) => {
-    status(`🤖 Subagent started: ${event.data.agentDisplayName}`);
+    if (debugLog) status(`🤖 Subagent started: ${event.data.agentDisplayName}`);
   });
 
   session.on("subagent.completed", (event) => {
-    status(`🤖 Subagent completed: ${event.data.agentName}`);
+    if (debugLog) status(`🤖 Subagent completed: ${event.data.agentName}`);
   });
 
   session.on("subagent.failed", (event) => {
-    errorStatus(`🤖 Subagent failed: ${event.data.agentName} - ${event.data.error}`);
+    if (debugLog) errorStatus(`🤖 Subagent failed: ${event.data.agentName} - ${event.data.error}`);
   });
 
   session.on("assistant.message_delta", (event) => {
